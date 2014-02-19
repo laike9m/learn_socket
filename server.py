@@ -30,7 +30,7 @@ def client_thread(conn):
 		reply = 'OK...' + data
 		if not data:
 			break
-		 
+ 
 		conn.sendall(reply.encode('utf-8'))
 	conn.close()
 
