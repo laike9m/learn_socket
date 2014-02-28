@@ -6,7 +6,7 @@ try:
 except socket.error as msg:
     print('Failed to create socket %s.' % msg)
     sys.exit()
-	
+
 print('Socket Created')
 
 host = 'www.google.com.hk'
@@ -28,7 +28,7 @@ print('Socket Connected to ' + host + ' on ip ' + remote_ip)
 # Send some data to remote server
 message = "GET / HTTP/1.1\r\n\r\n".encode('utf-8')
  
-try :
+try:
     # Set the whole string
     s.sendall(message)
 except socket.error:
