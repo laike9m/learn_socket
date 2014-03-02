@@ -20,6 +20,7 @@ print('Socket bind complete')
 s.listen(10)
 print('Socket now listening')
 
+
 # now keep talking with the client
 def client_thread(conn):
     while True:
@@ -41,7 +42,7 @@ while True:
     print('Connected with ' + addr[0] + ':' + str(addr[1]))
      
     # start new thread takes 1st argument as a function name to be run, second is the tuple of arguments to the function.
-    new_conn = Thread(target=client_thread ,args=(conn,))
+    new_conn = Thread(target=client_thread, args=(conn,))
     new_conn.start()
 
 s.close()

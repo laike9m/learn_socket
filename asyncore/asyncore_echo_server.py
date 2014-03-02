@@ -61,9 +61,8 @@ class EchoHandler(asyncore.dispatcher):
         sent = self.send(data[:self.chunk_size])
         if sent < len(data):
             remaining = data[sent:]
-            self.data.to_write.append(remaining)
-        self.logger.debug('handle_write() -> (%d) %r',
-                          sent, data[:sent])
+            self.data_to_write.append(remaining)
+        self.logger.debug('handle_write() -> (%d) %r', sent, data[:sent])
         if not self.writable():
             self.handle_close()
 
@@ -72,8 +71,7 @@ class EchoHandler(asyncore.dispatcher):
         and put it into the outgoing queue.
         """
         data = self.recv(self.chunk_size)
-        self.logger.debug('handle_read() -> (%d) %r',
-                          len(data), data)
+        self.logger.debug('handle_read() -> (%d) %r', len(data), data)
         self.data_to_write.insert(0, data)
 
     def handle_close(self):
@@ -140,9 +138,9 @@ if __name__ == '__main__':
                         format='%(name)-11s: %(message)s',
                         )
 
-    address = ('localhost', 0) # let the kernel assign a port
+    address = ('localhost', 0)  # let the kernel assign a port
     server = EchoServer(address)
-    ip, port = server.address # find out which port was assigned
+    ip, port = server.address  # find out which port was assigned
 
     message = open('lorem.txt', 'r').read()
     logging.info('Total message length: %d bytes', len(message))
