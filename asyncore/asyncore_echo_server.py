@@ -135,6 +135,7 @@ if __name__ == '__main__':
     import socket
 
     logging.basicConfig(level=logging.DEBUG,
+                        filename="log_asyncore_echo_server.log",
                         format='%(name)-11s: %(message)s',
                         )
 
