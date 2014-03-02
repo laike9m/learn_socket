@@ -1,0 +1,7 @@
+<html><body><pre>
+GET / HTTP/1.1
+Host: localhost:8000
+Accept-Encoding: gzip, deflate, compress
+Accept: */*
+User-Agent: python-requests/2.2.1 CPython/2.7.6 Windows/7</pre></body></html>
+
