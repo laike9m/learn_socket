@@ -10,9 +10,9 @@
 #
 
 import sys
-import socket
-from select import select
 import struct
+import socket
+from threading import Thread
 
 
 def bytes2addr(bytes):
@@ -35,7 +35,7 @@ def main():
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.sendto(pool, master)
     data, addr = sockfd.recvfrom(len(pool)+3)
-    if data != "ok "+pool:
+    if data != "ok " + pool:
         print sys.stderr, "unable to request!"
         sys.exit(1)
     sockfd.sendto("ok", master)
@@ -46,18 +46,20 @@ def main():
     target = bytes2addr(data)
     print sys.stderr, "connected to %s:%d" % target
 
-    while True:
-        rfds, _, _ = select([0, sockfd], [], [])
-        if 0 in rfds:
+    sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def send_msg(sock):
+        while True:
             data = sys.stdin.readline()
-            if not data:
-                break
-            sockfd.sendto(data, target)
-        elif sockfd in rfds:
-            data, addr = sockfd.recvfrom(1024)
+            sock.sendto(data, target)
+
+    def recv_msg(sock):
+        while True:
+            data, addr = sock.recvfrom(1024)
             sys.stdout.write(data)
 
-    sockfd.close()
+    Thread(target=send_msg, args=(sock_send,)).start()
+    Thread(target=recv_msg, args=(sockfd,)).start()
 
 
 if __name__ == "__main__":
