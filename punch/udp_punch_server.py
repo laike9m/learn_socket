@@ -43,30 +43,26 @@ def main():
 
     poolqueue = {}
     while True:
-        try:
-            data, addr = sockfd.recvfrom(32)
-            print "connection from %s:%d" % addr
+		data, addr = sockfd.recvfrom(32)
+		print "connection from %s:%d" % addr
 
-            pool = data.strip()
-            sockfd.sendto("ok "+pool, addr)
-            data, addr = sockfd.recvfrom(2)
-            if data != "ok":
-                continue
+		pool = data.strip()
+		sockfd.sendto("ok "+pool, addr)
+		data, addr = sockfd.recvfrom(2)
+		if data != "ok":
+			continue
 
-            print "request received for pool:", pool
+		print "request received for pool:", pool
 
-            try:
-                a, b = poolqueue[pool], addr
-                sockfd.sendto(addr2bytes(a), b)
-                sockfd.sendto(addr2bytes(b), a)
-                print "linked", pool
-                del poolqueue[pool]
-            except KeyError:
-                poolqueue[pool] = addr
-        except KeyboardInterrupt:
-            print("interrupt")
-            sockfd.close()
-            exit(0)
+		try:
+			a, b = poolqueue[pool], addr
+			sockfd.sendto(addr2bytes(a), b)
+			sockfd.sendto(addr2bytes(b), a)
+			print "linked", pool
+			del poolqueue[pool]
+		except KeyError:
+			poolqueue[pool] = addr
+
 
 if __name__ == "__main__":
-    main()
+	main()
