@@ -58,8 +58,10 @@ def main():
             data, addr = sock.recvfrom(1024)
             sys.stdout.write(data)
 
-    Thread(target=send_msg, args=(sock_send,)).start()
-    Thread(target=recv_msg, args=(sockfd,)).start()
+    send_thread = Thread(target=send_msg, args=(sock_send,))
+    send_thread.start()
+    recv_thread = Thread(target=recv_msg, args=(sockfd,))
+    recv_thread.start()
 
 
 if __name__ == "__main__":

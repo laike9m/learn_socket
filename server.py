@@ -4,7 +4,7 @@ import sys
 from threading import Thread
  
 HOST = ''    # Symbolic name meaning all available interfaces
-PORT = 8887  # Arbitrary non-privileged port
+PORT = 29325  # Arbitrary non-privileged port
  
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print('Socket created')
@@ -36,13 +36,18 @@ def client_thread(conn):
     conn.close()
 
 
-while True:
-    # wait to accept a connection - blocking call
-    conn, addr = s.accept()
-    print('Connected with ' + addr[0] + ':' + str(addr[1]))
-     
-    # start new thread takes 1st argument as a function name to be run, second is the tuple of arguments to the function.
-    new_conn = Thread(target=client_thread, args=(conn,))
-    new_conn.start()
+def main():
+    while True:
+        # wait to accept a connection - blocking call
+        conn, addr = s.accept()
+        print('Connected with ' + addr[0] + ':' + str(addr[1]))
 
-s.close()
+        # start new thread takes 1st argument as a function name to be run,
+        # second is the tuple of arguments to the function.
+        new_conn = Thread(target=client_thread, args=(conn,))
+        new_conn.start()
+
+    s.close()
+
+if __name__ == '__main__':
+    main()
