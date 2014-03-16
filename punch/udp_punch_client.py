@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#
+# coding:utf-8
 # Proof of Concept: UDP Hole Punching
 # Two client connect to a server and get redirected to each other.
 #

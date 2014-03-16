@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-#
+#!/usr/bin/env python2
+# coding:utf-8
 # Proof of Concept: UDP Hole Punching
 # Two client connect to a server and get redirected to each other.
 #
@@ -47,9 +47,9 @@ def main():
         print "connection from %s:%d" % addr
 
         pool = data.strip()
-        sockfd.sendto("ok "+pool, addr)
+        sockfd.sendto("ok " + pool, addr)
         print("pool={0}, ok sent to client".format(pool))
-        data, addr = sockfd.recvfrom(2)   # 卡在这里
+        data, addr = sockfd.recvfrom(2)
         if data != "ok":
             continue
 
