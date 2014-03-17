@@ -13,9 +13,14 @@ import optparse
 import sys
 import struct
 import socket
-from threading import Thread
+from threading import Thread, Event
 
 import stun
+
+FullCone = "Full Cone"
+RestrictNAT = "Restrict NAT"
+RestrictPortNAT = "Restrict Port NAT"
+SymmetricNAT = "Symmetric NAT"
 
 
 def bytes2addr(bytes):
@@ -27,72 +32,122 @@ def bytes2addr(bytes):
     return host, port
 
 
-def main():
-    get_nat_type()
-    try:
-        master = (sys.argv[1], int(sys.argv[2]))
-        pool = sys.argv[3].strip()
-    except (IndexError, ValueError):
-        print sys.stderr, "usage: %s <host> <port> <pool>" % sys.argv[0]
-        sys.exit(65)
+class Client():
 
-    sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sockfd.sendto(pool, master)
-    data, addr = sockfd.recvfrom(len(pool)+3)
-    if data != "ok " + pool:
-        print sys.stderr, "unable to request!"
-        sys.exit(1)
-    sockfd.sendto("ok", master)
-    sys.stderr = sys.stdout
-    print sys.stderr, "request sent, waiting for partner in pool '%s'..." % pool
-    data, addr = sockfd.recvfrom(6)
+    def __init__(self):
+        try:
+            self.master = (sys.argv[1], int(sys.argv[2]))
+            self.pool = sys.argv[3].strip()
+            self.sockfd = self.target = None
+        except (IndexError, ValueError):
+            print sys.stderr, "usage: %s <host> <port> <pool>" % sys.argv[0]
+            sys.exit(65)
 
-    target = bytes2addr(data)
-    print sys.stderr, "connected to %s:%d" % target
+    def request_for_connection(self, is_symmetric=False):
+        self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sockfd.sendto(self.pool, self.master)
+        data, addr = self.sockfd.recvfrom(len(self.pool) + 3)
+        if data != "ok " + self.pool:
+            print sys.stderr, "unable to request!"
+            sys.exit(1)
+        self.sockfd.sendto("ok", self.master)
+        sys.stderr = sys.stdout
+        print sys.stderr, "request sent, waiting for partner in pool '%s'..." % self.pool
+        data, addr = self.sockfd.recvfrom(6)
 
-    sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.target = bytes2addr(data)
+        print sys.stderr, "connected to %s:%d" % self.target
 
-    def send_msg(sock):
+    def recv_msg(self, sock, is_restrict=False, periodic_send=None, event=None):
+        if is_restrict:
+            while True:
+                data, addr = sock.recvfrom(1024)
+                if periodic_send.isAlive():
+                    periodic_send.cancel()
+                    event.set()
+                    print "received msg from target, periodic send cancelled, chat start."
+                print(addr)
+                if addr == self.target:
+                    sys.stdout.write(data)
+        else:
+            while True:
+                data, addr = sock.recvfrom(1024)
+                print(addr)
+                if addr == self.target:
+                    sys.stdout.write(data)
+
+    def send_msg(self, sock):
         while True:
             data = sys.stdin.readline()
-            sock.sendto(data, target)
+            sock.sendto(data, self.target)
 
-    def recv_msg(sock):
-        while True:
-            data, addr = sock.recvfrom(1024)
-            sys.stdout.write(data)
+    def chat_fullcone(self):
+        send_thread = Thread(target=self.send_msg, args=(self.sockfd,))
+        send_thread.start()
+        recv_thread = Thread(target=self.recv_msg, args=(self.sockfd,))
+        recv_thread.start()
 
-    send_thread = Thread(target=send_msg, args=(sock_send,))
-    send_thread.start()
-    recv_thread = Thread(target=recv_msg, args=(sockfd,))
-    recv_thread.start()
+    def chat_restrict(self):
+        from threading import Timer
+        cancel_event = Event()
+        periodic_send = Timer(0.5, self.sockfd.sendto, args=('blablabla', self.target))
+        periodic_send.start()
+        kwargs = {'is_restrict': True, 'periodic_send': periodic_send, 'event': cancel_event}
+        recv_thread = Thread(target=self.recv_msg, args=(self.sockfd,), kwargs=kwargs)
+        recv_thread.start()
+        cancel_event.wait()
+        send_thread = Thread(target=self.send_msg, args=(self.sockfd,))
+        send_thread.start()
 
+    def chat_symmetric(self):
+        pass
 
-def get_nat_type():
-    parser = optparse.OptionParser(version=stun.__version__)
-    parser.add_option("-d", "--debug", dest="DEBUG", action="store_true",
-                      default=False, help="Enable debug logging")
-    parser.add_option("-H", "--host", dest="stun_host", default=None,
-                      help="STUN host to use")
-    parser.add_option("-P", "--host-port", dest="stun_port", type="int",
-                      default=3478, help="STUN host port to use (default: "
-                      "3478)")
-    parser.add_option("-i", "--interface", dest="source_ip", default="0.0.0.0",
-                      help="network interface for client (default: 0.0.0.0)")
-    parser.add_option("-p", "--port", dest="source_port", type="int",
-                      default=54320, help="port to listen on for client "
-                      "(default: 54320)")
-    (options, args) = parser.parse_args()
-    if options.DEBUG:
-        stun.enable_logging()
-    kwargs = dict(source_ip=options.source_ip,
-                  source_port=int(options.source_port),
-                  stun_host=options.stun_host,
-                  stun_port=options.stun_port)
-    nat_type, external_ip, external_port = stun.get_ip_info(**kwargs)
-    print "NAT Type:", nat_type
-    print "External IP:", external_ip
-    print "External Port:", external_port
+    def main(self, test_nat_type=None):
+        if not test_nat_type:
+            nat_type, _, _ = self.get_nat_type()
+        if nat_type in (FullCone, RestrictNAT, RestrictPortNAT):
+            self.request_for_connection()
+            if nat_type == FullCone:
+                print("FullCone chat mode")
+                self.chat_fullcone()
+            else:
+                print("Restrict chat mode")
+                self.chat_restrict()
+        elif nat_type == SymmetricNAT:
+            self.request_for_connection(isSymmetric=True)
+            self.chat_symmetric()
+        else:
+            print("NAT type wrong!")
+
+    @staticmethod
+    def get_nat_type():
+        parser = optparse.OptionParser(version=stun.__version__)
+        parser.add_option("-d", "--debug", dest="DEBUG", action="store_true",
+                          default=False, help="Enable debug logging")
+        parser.add_option("-H", "--host", dest="stun_host", default=None,
+                          help="STUN host to use")
+        parser.add_option("-P", "--host-port", dest="stun_port", type="int",
+                          default=3478, help="STUN host port to use (default: "
+                          "3478)")
+        parser.add_option("-i", "--interface", dest="source_ip", default="0.0.0.0",
+                          help="network interface for client (default: 0.0.0.0)")
+        parser.add_option("-p", "--port", dest="source_port", type="int",
+                          default=54320, help="port to listen on for client "
+                          "(default: 54320)")
+        (options, args) = parser.parse_args()
+        if options.DEBUG:
+            stun.enable_logging()
+        kwargs = dict(source_ip=options.source_ip,
+                      source_port=int(options.source_port),
+                      stun_host=options.stun_host,
+                      stun_port=options.stun_port)
+        nat_type, external_ip, external_port = stun.get_ip_info(**kwargs)
+        print "NAT Type:", nat_type
+        print "External IP:", external_ip
+        print "External Port:", external_port
+        return nat_type, external_ip, external_port
 
 if __name__ == "__main__":
-    main()
+    c = Client()
+    c.main()
+    #c.main(test_nat_type=RestrictNAT)

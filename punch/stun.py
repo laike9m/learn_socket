@@ -79,8 +79,8 @@ Blocked = "Blocked"
 OpenInternet = "Open Internet"
 FullCone = "Full Cone"
 SymmetricUDPFirewall = "Symmetric UDP Firewall"
-RestricNAT = "Restric NAT"
-RestricPortNAT = "Restric Port NAT"
+RestrictNAT = "Restrict NAT"
+RestrictPortNAT = "Restrict Port NAT"
 SymmetricNAT = "Symmetric NAT"
 ChangedAddressError = "Meet an error, when do Test1 on Changed IP and Port"
 
@@ -233,9 +233,9 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                                     changePortRequest)
                     log.debug("Result: %s" % ret)
                     if ret['Resp'] == True:
-                        typ = RestricNAT
+                        typ = RestrictNAT
                     else:
-                        typ = RestricPortNAT
+                        typ = RestrictPortNAT
                 else:
                     typ = SymmetricNAT
     return typ, ret
@@ -252,7 +252,8 @@ def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
     external_ip = nat['ExternalIP']
     external_port = nat['ExternalPort']
     s.close()
-    return (nat_type, external_ip, external_port)
+    socket.setdefaulttimeout(None)
+    return nat_type, external_ip, external_port
 
 
 def main():
