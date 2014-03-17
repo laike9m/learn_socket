@@ -39,6 +39,7 @@ class Client():
             self.master = (sys.argv[1], int(sys.argv[2]))
             self.pool = sys.argv[3].strip()
             self.sockfd = self.target = None
+            self.periodic_running = False
         except (IndexError, ValueError):
             print sys.stderr, "usage: %s <host> <port> <pool>" % sys.argv[0]
             sys.exit(65)
@@ -58,12 +59,13 @@ class Client():
         self.target = bytes2addr(data)
         print sys.stderr, "connected to %s:%d" % self.target
 
-    def recv_msg(self, sock, is_restrict=False, periodic_send=None, event=None):
+    def recv_msg(self, sock, is_restrict=False, event=None):
         if is_restrict:
             while True:
                 data, addr = sock.recvfrom(1024)
-                if periodic_send.isAlive():
-                    periodic_send.cancel()
+                if self.periodic_running:
+                    print "periodic_send is alive"
+                    self.periodic_send = False
                     event.set()
                     print "received msg from target, periodic send cancelled, chat start."
                 print(addr)
@@ -90,9 +92,16 @@ class Client():
     def chat_restrict(self):
         from threading import Timer
         cancel_event = Event()
-        periodic_send = Timer(0.5, self.sockfd.sendto, args=('blablabla', self.target))
-        periodic_send.start()
-        kwargs = {'is_restrict': True, 'periodic_send': periodic_send, 'event': cancel_event}
+
+        def send(count):
+            self.sockfd.sendto('torr', self.target)
+            print("send torr{0}".format(count))
+            if self.periodic_running:
+                Timer(0.5, send, args=(count + 1,)).start()
+
+        self.periodic_running = True
+        send(0)
+        kwargs = {'is_restrict': True, 'event': cancel_event}
         recv_thread = Thread(target=self.recv_msg, args=(self.sockfd,), kwargs=kwargs)
         recv_thread.start()
         cancel_event.wait()
@@ -105,6 +114,8 @@ class Client():
     def main(self, test_nat_type=None):
         if not test_nat_type:
             nat_type, _, _ = self.get_nat_type()
+        else:
+            nat_type = test_nat_type  # 假装正在测试某种类型的NAT
         if nat_type in (FullCone, RestrictNAT, RestrictPortNAT):
             self.request_for_connection()
             if nat_type == FullCone:
@@ -149,5 +160,5 @@ class Client():
 
 if __name__ == "__main__":
     c = Client()
-    c.main()
-    #c.main(test_nat_type=RestrictNAT)
+    #c.main()
+    c.main(test_nat_type=RestrictNAT)
