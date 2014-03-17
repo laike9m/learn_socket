@@ -65,7 +65,7 @@ class Client():
                 data, addr = sock.recvfrom(1024)
                 if self.periodic_running:
                     print "periodic_send is alive"
-                    self.periodic_send = False
+                    self.periodic_running = False
                     event.set()
                     print "received msg from target, periodic send cancelled, chat start."
                 print(addr)
@@ -95,7 +95,7 @@ class Client():
 
         def send(count):
             self.sockfd.sendto('torr', self.target)
-            print("send torr{0}".format(count))
+            print("send UDP punching package {0}".format(count))
             if self.periodic_running:
                 Timer(0.5, send, args=(count + 1,)).start()
 
