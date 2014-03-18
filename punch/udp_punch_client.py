@@ -48,7 +48,7 @@ class Client():
             print sys.stderr, "usage: %s <host> <port> <pool>" % sys.argv[0]
             sys.exit(65)
 
-    def request_for_connection(self, nat_type_id, is_symmetric=False):
+    def request_for_connection(self, nat_type_id=0, is_symmetric=False):
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.sendto(self.pool + ' {0}'.format(nat_type_id), self.master)
         data, addr = self.sockfd.recvfrom(len(self.pool) + 3)
@@ -118,20 +118,29 @@ class Client():
         pass
 
     def main(self, test_nat_type=None):
+        """
+        nat_type是自己的nat类型
+        peer_nat_type是从服务器获取的对方的nat类型
+        选择哪种chat模式是根据nat_type来选择, 例如我这边的NAT设备是restrict, 那么必须得我一直向对方发包,
+        我的NAT设备才能识别对方为"我已经发过包的地址". 直到收到对方的包, periodic发送停止
+        """
         if not test_nat_type:
             nat_type, _, _ = self.get_nat_type()
         else:
             nat_type = test_nat_type  # 假装正在测试某种类型的NAT
         if nat_type in (FullCone, RestrictNAT, RestrictPortNAT):
-            self.request_for_connection(NATTYPE.index(nat_type))
+            self.request_for_connection(nat_type_id=NATTYPE.index(nat_type))
             if nat_type == FullCone:
                 print("FullCone chat mode")
                 self.chat_fullcone()
-            else:
+            elif nat_type in (RestrictNAT, RestrictPortNAT):
                 print("Restrict chat mode")
                 self.chat_restrict()
+            else:
+                print("Symmetric chat mode")
+                self.chat_symmetric()
         elif nat_type == SymmetricNAT:
-            self.request_for_connection(isSymmetric=True)
+            self.request_for_connection(nat_type_id=3, is_symmetric=True)
             self.chat_symmetric()
         else:
             print("NAT type wrong!")
