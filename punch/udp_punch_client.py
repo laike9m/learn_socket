@@ -39,7 +39,8 @@ class Client():
 
     def __init__(self):
         try:
-            self.master = (sys.argv[1], int(sys.argv[2]))
+            master_ip = '127.0.0.1' if sys.argv[1] == 'localhost' else sys.argv[1]
+            self.master = (master_ip, int(sys.argv[2]))
             self.pool = sys.argv[3].strip()
             self.sockfd = self.target = None
             self.periodic_running = False
@@ -48,7 +49,7 @@ class Client():
             print sys.stderr, "usage: %s <host> <port> <pool>" % sys.argv[0]
             sys.exit(65)
 
-    def request_for_connection(self, nat_type_id=0, is_symmetric=False):
+    def request_for_connection(self, nat_type_id=0):
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.sendto(self.pool + ' {0}'.format(nat_type_id), self.master)
         data, addr = self.sockfd.recvfrom(len(self.pool) + 3)
@@ -75,13 +76,13 @@ class Client():
                     event.set()
                     print "received msg from target, periodic send cancelled, chat start."
                 print(addr)
-                if addr == self.target:
+                if addr == self.target or addr == self.master:
                     sys.stdout.write(data)
         else:
             while True:
                 data, addr = sock.recvfrom(1024)
                 print(addr)
-                if addr == self.target:
+                if addr == self.target or addr == self.master:
                     sys.stdout.write(data)
 
     def send_msg(self, sock):
@@ -90,10 +91,8 @@ class Client():
             sock.sendto(data, self.target)
 
     def chat_fullcone(self):
-        send_thread = Thread(target=self.send_msg, args=(self.sockfd,))
-        send_thread.start()
-        recv_thread = Thread(target=self.recv_msg, args=(self.sockfd,))
-        recv_thread.start()
+        Thread(target=self.send_msg, args=(self.sockfd,)).start()
+        Thread(target=self.recv_msg, args=(self.sockfd,)).start()
 
     def chat_restrict(self):
         from threading import Timer
@@ -108,40 +107,52 @@ class Client():
         self.periodic_running = True
         send(0)
         kwargs = {'is_restrict': True, 'event': cancel_event}
-        recv_thread = Thread(target=self.recv_msg, args=(self.sockfd,), kwargs=kwargs)
-        recv_thread.start()
+        Thread(target=self.recv_msg, args=(self.sockfd,), kwargs=kwargs).start()
         cancel_event.wait()
-        send_thread = Thread(target=self.send_msg, args=(self.sockfd,))
-        send_thread.start()
+        Thread(target=self.send_msg, args=(self.sockfd,)).start()
 
     def chat_symmetric(self):
-        pass
+        """
+        完全依赖服务器转发
+        """
+        def send_msg_symm(sock):
+            while True:
+                data = 'msg ' + sys.stdin.readline()
+                sock.sendto(data, self.master)
+
+        def recv_msg_symm(sock):
+            while True:
+                data, addr = sock.recvfrom(1024)
+                if addr == self.master:
+                    print(addr)
+                    sys.stdout.write(data)
+        Thread(target=send_msg_symm, args=(self.sockfd,)).start()
+        Thread(target=recv_msg_symm, args=(self.sockfd,)).start()
 
     def main(self, test_nat_type=None):
         """
         nat_type是自己的nat类型
         peer_nat_type是从服务器获取的对方的nat类型
-        选择哪种chat模式是根据nat_type来选择, 例如我这边的NAT设备是restrict, 那么必须得我一直向对方发包,
+        选择哪种chat模式是根据nat_type来选择, 例如我这边的NAT设备是restrict, 那么我必须得一直向对方发包,
         我的NAT设备才能识别对方为"我已经发过包的地址". 直到收到对方的包, periodic发送停止
         """
         if not test_nat_type:
             nat_type, _, _ = self.get_nat_type()
         else:
             nat_type = test_nat_type  # 假装正在测试某种类型的NAT
-        if nat_type in (FullCone, RestrictNAT, RestrictPortNAT):
+        try:
             self.request_for_connection(nat_type_id=NATTYPE.index(nat_type))
-            if nat_type == FullCone:
-                print("FullCone chat mode")
-                self.chat_fullcone()
-            elif nat_type in (RestrictNAT, RestrictPortNAT):
-                print("Restrict chat mode")
-                self.chat_restrict()
-            else:
-                print("Symmetric chat mode")
-                self.chat_symmetric()
-        elif nat_type == SymmetricNAT:
-            self.request_for_connection(nat_type_id=3, is_symmetric=True)
+        except ValueError:
+            print("NAT type is %s" % nat_type)
+        if nat_type == SymmetricNAT or self.peer_nat_type == SymmetricNAT:
+            print("Symmetric chat mode")
             self.chat_symmetric()
+        elif nat_type == FullCone:
+            print("FullCone chat mode")
+            self.chat_fullcone()
+        elif nat_type in (RestrictNAT, RestrictPortNAT):
+            print("Restrict chat mode")
+            self.chat_restrict()
         else:
             print("NAT type wrong!")
 
