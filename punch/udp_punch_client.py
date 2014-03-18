@@ -17,19 +17,22 @@ from threading import Thread, Event
 
 import stun
 
-FullCone = "Full Cone"
-RestrictNAT = "Restrict NAT"
-RestrictPortNAT = "Restrict Port NAT"
-SymmetricNAT = "Symmetric NAT"
+FullCone = "Full Cone"  # 0
+RestrictNAT = "Restrict NAT"  # 1
+RestrictPortNAT = "Restrict Port NAT"  # 2
+SymmetricNAT = "Symmetric NAT"  # 3
+NATTYPE = (FullCone, RestrictNAT, RestrictPortNAT, SymmetricNAT)
 
 
 def bytes2addr(bytes):
     """Convert a hash to an address pair."""
-    if len(bytes) != 6:
+    if len(bytes) != 8:
         raise ValueError("invalid bytes")
     host = socket.inet_ntoa(bytes[:4])
-    port, = struct.unpack("H", bytes[-2:])
-    return host, port
+    port = struct.unpack("H", bytes[-4:-2])[0]  # unpack returns a tuple even if it contains exactly one item
+    nat_type_id = struct.unpack("H", bytes[-2:])[0]
+    target = (host, port)
+    return target, nat_type_id
 
 
 class Client():
@@ -40,13 +43,14 @@ class Client():
             self.pool = sys.argv[3].strip()
             self.sockfd = self.target = None
             self.periodic_running = False
+            self.peer_nat_type = None
         except (IndexError, ValueError):
             print sys.stderr, "usage: %s <host> <port> <pool>" % sys.argv[0]
             sys.exit(65)
 
-    def request_for_connection(self, is_symmetric=False):
+    def request_for_connection(self, nat_type_id, is_symmetric=False):
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sockfd.sendto(self.pool, self.master)
+        self.sockfd.sendto(self.pool + ' {0}'.format(nat_type_id), self.master)
         data, addr = self.sockfd.recvfrom(len(self.pool) + 3)
         if data != "ok " + self.pool:
             print sys.stderr, "unable to request!"
@@ -54,10 +58,12 @@ class Client():
         self.sockfd.sendto("ok", self.master)
         sys.stderr = sys.stdout
         print sys.stderr, "request sent, waiting for partner in pool '%s'..." % self.pool
-        data, addr = self.sockfd.recvfrom(6)
+        data, addr = self.sockfd.recvfrom(8)
 
-        self.target = bytes2addr(data)
-        print sys.stderr, "connected to %s:%d" % self.target
+        self.target, peer_nat_type_id = bytes2addr(data)
+        print(self.target, peer_nat_type_id)
+        self.peer_nat_type = NATTYPE[peer_nat_type_id]
+        print sys.stderr, "connected to {1}:{2}, its NAT type is {0}".format(self.peer_nat_type, *self.target)
 
     def recv_msg(self, sock, is_restrict=False, event=None):
         if is_restrict:
@@ -94,7 +100,7 @@ class Client():
         cancel_event = Event()
 
         def send(count):
-            self.sockfd.sendto('torr', self.target)
+            self.sockfd.sendto('torr\n', self.target)
             print("send UDP punching package {0}".format(count))
             if self.periodic_running:
                 Timer(0.5, send, args=(count + 1,)).start()
@@ -117,7 +123,7 @@ class Client():
         else:
             nat_type = test_nat_type  # 假装正在测试某种类型的NAT
         if nat_type in (FullCone, RestrictNAT, RestrictPortNAT):
-            self.request_for_connection()
+            self.request_for_connection(NATTYPE.index(nat_type))
             if nat_type == FullCone:
                 print("FullCone chat mode")
                 self.chat_fullcone()
@@ -160,5 +166,8 @@ class Client():
 
 if __name__ == "__main__":
     c = Client()
-    #c.main()
-    c.main(test_nat_type=RestrictNAT)
+    try:
+        test_nat_type = NATTYPE[int(sys.argv[4])]  # 输入数字0,1,2,3
+    except IndexError:
+        test_nat_type = None
+    c.main(test_nat_type)
