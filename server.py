@@ -23,15 +23,15 @@ print('Socket now listening')
 
 # now keep talking with the client
 def client_thread(conn):
+    conn.send('Welcome to the server. Type something and hit enter\n'.encode('utf-8'))
     while True:
-        conn.send('Welcome to the server. Type something and hit enter\n'.encode('utf-8'))
-
         # wait to accept a connection - blocking call
         data = conn.recv(1024).decode('utf-8')
         reply = 'OK...' + data
         if not data:
             break
- 
+
+        print(data)
         conn.sendall(reply.encode('utf-8'))
     conn.close()
 
