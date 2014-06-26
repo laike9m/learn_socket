@@ -17,8 +17,8 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 while True:
     try:
         data = sys.stdin.readline()
-        s.sendto(data, (host, port))
-        data = s.recvfrom(size)
+        s.sendto(data.encode('utf-8'), (host, port))
+        data, addr = s.recvfrom(size)
         print('Received:', data.decode('utf-8'))
     except KeyboardInterrupt:
         s.close()

@@ -17,8 +17,8 @@ s.connect((host, port))
 while True:
     try:
         data = sys.stdin.readline()
-        s.send(data)
+        s.send(data.encode('utf-8'))
         data = s.recv(size)
-        print 'Received:', data
+        print('Received:', data.decode('utf-8'))
     except KeyboardInterrupt:
         s.close()
