@@ -8,8 +8,8 @@ A simple echo client
 import socket
 import sys
 
-host = '108.59.10.235'
-port = 29325
+host = '205.147.105.205'
+port = 1111
 size = 1024
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((host, port))

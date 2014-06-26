@@ -4,7 +4,7 @@ import sys
 from threading import Thread
  
 HOST = ''    # Symbolic name meaning all available interfaces
-PORT = 29325  # Arbitrary non-privileged port
+PORT = 1111 # Arbitrary non-privileged port
  
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print('Socket created')

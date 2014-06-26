@@ -3,7 +3,7 @@ import socket
 from threading import Thread
  
 HOST = ''    # Symbolic name meaning all available interfaces
-PORT = 29325  # Arbitrary non-privileged port
+PORT = 1112  # Arbitrary non-privileged port
  
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
