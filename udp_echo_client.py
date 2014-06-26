@@ -12,12 +12,14 @@ host = '205.147.105.205'
 port = 1112
 size = 1024
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+s.bind(('', 801))
 
 while True:
     try:
         data = sys.stdin.readline()
         s.sendto(data.encode('utf-8'), (host, port))
+        addr = s.getsockname()
+        print(addr)
         data, addr = s.recvfrom(size)
         print('Received:', data.decode('utf-8'))
     except KeyboardInterrupt:
